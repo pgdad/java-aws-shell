@@ -170,7 +170,444 @@ public class S3Commands {
         }
     }
 
+    /**
+     * Check if a bucket exists
+     * <p>
+     * Usage:
+     * s3 head-bucket s3://bucket-name
+     * s3 head-bucket s3://$BUCKET
+     */
+    @ShellMethod(key = "s3 head-bucket", value = "Check if a bucket exists")
+    public String headBucket(String bucketUri) {
+        try {
+            bucketUri = sessionContext.resolveVariables(bucketUri);
+            S3Path s3Path = parseS3Path(bucketUri);
+
+            HeadBucketRequest request = HeadBucketRequest.builder()
+                    .bucket(s3Path.bucket)
+                    .build();
+
+            s3Client.headBucket(request);
+            return "Bucket exists: " + s3Path.bucket;
+        } catch (Exception e) {
+            return "Bucket does not exist or is not accessible: " + e.getMessage();
+        }
+    }
+
+    /**
+     * Get bucket location
+     * <p>
+     * Usage:
+     * s3 get-bucket-location s3://bucket-name
+     */
+    @ShellMethod(key = "s3 get-bucket-location", value = "Get bucket region")
+    public String getBucketLocation(String bucketUri) {
+        try {
+            bucketUri = sessionContext.resolveVariables(bucketUri);
+            S3Path s3Path = parseS3Path(bucketUri);
+
+            GetBucketLocationRequest request = GetBucketLocationRequest.builder()
+                    .bucket(s3Path.bucket)
+                    .build();
+
+            GetBucketLocationResponse response = s3Client.getBucketLocation(request);
+
+            List<String[]> pairs = new ArrayList<>();
+            pairs.add(new String[]{"Bucket", s3Path.bucket});
+            pairs.add(new String[]{"Region", response.locationConstraintAsString()});
+
+            return OutputFormatter.toKeyValue(pairs);
+        } catch (Exception e) {
+            return "Error: " + e.getMessage();
+        }
+    }
+
+    /**
+     * Get object metadata
+     * <p>
+     * Usage:
+     * s3 head-object s3://bucket/key
+     */
+    @ShellMethod(key = "s3 head-object", value = "Get object metadata")
+    public String headObject(String path) {
+        try {
+            path = sessionContext.resolveVariables(path);
+            S3Path s3Path = parseS3Path(path);
+
+            HeadObjectRequest request = HeadObjectRequest.builder()
+                    .bucket(s3Path.bucket)
+                    .key(s3Path.key)
+                    .build();
+
+            HeadObjectResponse response = s3Client.headObject(request);
+
+            List<String[]> pairs = new ArrayList<>();
+            pairs.add(new String[]{"Bucket", s3Path.bucket});
+            pairs.add(new String[]{"Key", s3Path.key});
+            pairs.add(new String[]{"Size", formatSize(response.contentLength())});
+            pairs.add(new String[]{"Content-Type", response.contentType()});
+            pairs.add(new String[]{"Last Modified", response.lastModified().toString()});
+            pairs.add(new String[]{"ETag", response.eTag()});
+            if (response.storageClassAsString() != null) {
+                pairs.add(new String[]{"Storage Class", response.storageClassAsString()});
+            }
+
+            return OutputFormatter.toKeyValue(pairs);
+        } catch (Exception e) {
+            return "Error: " + e.getMessage();
+        }
+    }
+
+    /**
+     * Get bucket versioning status
+     * <p>
+     * Usage:
+     * s3 get-bucket-versioning s3://bucket-name
+     */
+    @ShellMethod(key = "s3 get-bucket-versioning", value = "Get bucket versioning status")
+    public String getBucketVersioning(String bucketUri) {
+        try {
+            bucketUri = sessionContext.resolveVariables(bucketUri);
+            S3Path s3Path = parseS3Path(bucketUri);
+
+            GetBucketVersioningRequest request = GetBucketVersioningRequest.builder()
+                    .bucket(s3Path.bucket)
+                    .build();
+
+            GetBucketVersioningResponse response = s3Client.getBucketVersioning(request);
+
+            List<String[]> pairs = new ArrayList<>();
+            pairs.add(new String[]{"Bucket", s3Path.bucket});
+            pairs.add(new String[]{"Status", response.statusAsString() != null ? response.statusAsString() : "Disabled"});
+            pairs.add(new String[]{"MFA Delete", response.mfaDeleteAsString() != null ? response.mfaDeleteAsString() : "Disabled"});
+
+            return OutputFormatter.toKeyValue(pairs);
+        } catch (Exception e) {
+            return "Error: " + e.getMessage();
+        }
+    }
+
+    /**
+     * Enable bucket versioning
+     * <p>
+     * Usage:
+     * s3 put-bucket-versioning s3://bucket-name --status Enabled
+     * s3 put-bucket-versioning s3://bucket-name --status Suspended
+     */
+    @ShellMethod(key = "s3 put-bucket-versioning", value = "Enable or suspend bucket versioning")
+    public String putBucketVersioning(String bucketUri, String status) {
+        try {
+            bucketUri = sessionContext.resolveVariables(bucketUri);
+            status = sessionContext.resolveVariables(status);
+            S3Path s3Path = parseS3Path(bucketUri);
+
+            VersioningConfiguration versioningConfig = VersioningConfiguration.builder()
+                    .status(status)
+                    .build();
+
+            PutBucketVersioningRequest request = PutBucketVersioningRequest.builder()
+                    .bucket(s3Path.bucket)
+                    .versioningConfiguration(versioningConfig)
+                    .build();
+
+            s3Client.putBucketVersioning(request);
+            return "Bucket versioning set to: " + status + " for " + s3Path.bucket;
+        } catch (Exception e) {
+            return "Error: " + e.getMessage();
+        }
+    }
+
+    /**
+     * Get object tagging
+     * <p>
+     * Usage:
+     * s3 get-object-tagging s3://bucket/key
+     */
+    @ShellMethod(key = "s3 get-object-tagging", value = "Get object tags")
+    public String getObjectTagging(String path) {
+        try {
+            path = sessionContext.resolveVariables(path);
+            S3Path s3Path = parseS3Path(path);
+
+            GetObjectTaggingRequest request = GetObjectTaggingRequest.builder()
+                    .bucket(s3Path.bucket)
+                    .key(s3Path.key)
+                    .build();
+
+            GetObjectTaggingResponse response = s3Client.getObjectTagging(request);
+
+            if (response.tagSet().isEmpty()) {
+                return "No tags found for: " + path;
+            }
+
+            List<String[]> rows = new ArrayList<>();
+            rows.add(new String[]{"Key", "Value"});
+
+            for (Tag tag : response.tagSet()) {
+                rows.add(new String[]{tag.key(), tag.value()});
+            }
+
+            return OutputFormatter.toTable(rows);
+        } catch (Exception e) {
+            return "Error: " + e.getMessage();
+        }
+    }
+
+    /**
+     * Put object tagging
+     * <p>
+     * Usage:
+     * s3 put-object-tagging s3://bucket/key --tags "Key1=Value1,Key2=Value2"
+     */
+    @ShellMethod(key = "s3 put-object-tagging", value = "Set object tags")
+    public String putObjectTagging(String path, String tags) {
+        try {
+            path = sessionContext.resolveVariables(path);
+            tags = sessionContext.resolveVariables(tags);
+            S3Path s3Path = parseS3Path(path);
+
+            // Parse tags "Key1=Value1,Key2=Value2"
+            List<Tag> tagList = new ArrayList<>();
+            for (String tagPair : tags.split(",")) {
+                String[] parts = tagPair.trim().split("=", 2);
+                if (parts.length == 2) {
+                    tagList.add(Tag.builder().key(parts[0].trim()).value(parts[1].trim()).build());
+                }
+            }
+
+            Tagging tagging = Tagging.builder().tagSet(tagList).build();
+
+            PutObjectTaggingRequest request = PutObjectTaggingRequest.builder()
+                    .bucket(s3Path.bucket)
+                    .key(s3Path.key)
+                    .tagging(tagging)
+                    .build();
+
+            s3Client.putObjectTagging(request);
+            return "Tags set for: " + path;
+        } catch (Exception e) {
+            return "Error: " + e.getMessage();
+        }
+    }
+
+    /**
+     * Delete object tagging
+     * <p>
+     * Usage:
+     * s3 delete-object-tagging s3://bucket/key
+     */
+    @ShellMethod(key = "s3 delete-object-tagging", value = "Delete object tags")
+    public String deleteObjectTagging(String path) {
+        try {
+            path = sessionContext.resolveVariables(path);
+            S3Path s3Path = parseS3Path(path);
+
+            DeleteObjectTaggingRequest request = DeleteObjectTaggingRequest.builder()
+                    .bucket(s3Path.bucket)
+                    .key(s3Path.key)
+                    .build();
+
+            s3Client.deleteObjectTagging(request);
+            return "Tags deleted for: " + path;
+        } catch (Exception e) {
+            return "Error: " + e.getMessage();
+        }
+    }
+
+    /**
+     * Delete multiple objects
+     * <p>
+     * Usage:
+     * s3 delete-objects s3://bucket --keys "key1,key2,key3"
+     */
+    @ShellMethod(key = "s3 delete-objects", value = "Delete multiple objects")
+    public String deleteObjects(String bucketUri, String keys) {
+        try {
+            bucketUri = sessionContext.resolveVariables(bucketUri);
+            keys = sessionContext.resolveVariables(keys);
+            S3Path s3Path = parseS3Path(bucketUri);
+
+            // Parse keys
+            List<ObjectIdentifier> objectIds = new ArrayList<>();
+            for (String key : keys.split(",")) {
+                objectIds.add(ObjectIdentifier.builder().key(key.trim()).build());
+            }
+
+            Delete delete = Delete.builder().objects(objectIds).build();
+
+            DeleteObjectsRequest request = DeleteObjectsRequest.builder()
+                    .bucket(s3Path.bucket)
+                    .delete(delete)
+                    .build();
+
+            DeleteObjectsResponse response = s3Client.deleteObjects(request);
+
+            return "Deleted " + response.deleted().size() + " objects from " + s3Path.bucket;
+        } catch (Exception e) {
+            return "Error: " + e.getMessage();
+        }
+    }
+
+    /**
+     * Get object URL (without presigning - requires AWS credentials to access)
+     * <p>
+     * Usage:
+     * s3 get-object-url s3://bucket/key
+     */
+    @ShellMethod(key = "s3 get-object-url", value = "Get object URL")
+    public String getObjectUrl(String path) {
+        try {
+            path = sessionContext.resolveVariables(path);
+            S3Path s3Path = parseS3Path(path);
+
+            // Get bucket location
+            GetBucketLocationRequest locationRequest = GetBucketLocationRequest.builder()
+                    .bucket(s3Path.bucket)
+                    .build();
+
+            GetBucketLocationResponse locationResponse = s3Client.getBucketLocation(locationRequest);
+            String region = locationResponse.locationConstraintAsString();
+            if (region == null || region.isEmpty()) {
+                region = "us-east-1";
+            }
+
+            String url = String.format("https://%s.s3.%s.amazonaws.com/%s",
+                    s3Path.bucket, region, s3Path.key);
+
+            return "Object URL:\n" + url + "\n\nNote: This URL requires AWS credentials to access. For public access, use bucket policies or ACLs.";
+        } catch (Exception e) {
+            return "Error: " + e.getMessage();
+        }
+    }
+
+    /**
+     * Move object (copy and delete)
+     * <p>
+     * Usage:
+     * s3 mv s3://bucket/source s3://bucket/dest
+     */
+    @ShellMethod(key = "s3 mv", value = "Move S3 object")
+    public String moveObject(String source, String destination) {
+        try {
+            source = sessionContext.resolveVariables(source);
+            destination = sessionContext.resolveVariables(destination);
+
+            // Copy the object
+            String copyResult = copyS3Object(source, destination);
+            if (copyResult.startsWith("Error")) {
+                return copyResult;
+            }
+
+            // Delete the source
+            S3Path sourcePath = parseS3Path(source);
+            DeleteObjectRequest deleteRequest = DeleteObjectRequest.builder()
+                    .bucket(sourcePath.bucket)
+                    .key(sourcePath.key)
+                    .build();
+
+            s3Client.deleteObject(deleteRequest);
+
+            return "Moved: " + source + " -> " + destination;
+        } catch (Exception e) {
+            return "Error: " + e.getMessage();
+        }
+    }
+
+    /**
+     * Sync local directory to S3 or vice versa
+     * <p>
+     * Usage:
+     * s3 sync ./local-dir s3://bucket/prefix
+     * s3 sync s3://bucket/prefix ./local-dir
+     */
+    @ShellMethod(key = "s3 sync", value = "Sync files between local and S3")
+    public String sync(String source, String destination) {
+        try {
+            source = sessionContext.resolveVariables(source);
+            destination = sessionContext.resolveVariables(destination);
+
+            boolean sourceIsS3 = source.startsWith("s3://");
+            boolean destIsS3 = destination.startsWith("s3://");
+
+            if (sourceIsS3 == destIsS3) {
+                return "Error: One path must be local and one must be S3";
+            }
+
+            if (sourceIsS3) {
+                return syncFromS3(source, destination);
+            } else {
+                return syncToS3(source, destination);
+            }
+        } catch (Exception e) {
+            return "Error: " + e.getMessage();
+        }
+    }
+
     // Helper methods
+
+    private String syncToS3(String localPath, String s3Uri) throws Exception {
+        S3Path s3Path = parseS3Path(s3Uri);
+        Path localDir = Paths.get(localPath);
+
+        if (!Files.exists(localDir) || !Files.isDirectory(localDir)) {
+            return "Error: Local path must be a directory";
+        }
+
+        int uploadCount = 0;
+        Files.walk(localDir).filter(Files::isRegularFile).forEach(file -> {
+            try {
+                String relativePath = localDir.relativize(file).toString().replace("\\", "/");
+                String s3Key = s3Path.key.isEmpty() ? relativePath : s3Path.key + "/" + relativePath;
+
+                PutObjectRequest request = PutObjectRequest.builder()
+                        .bucket(s3Path.bucket)
+                        .key(s3Key)
+                        .build();
+
+                s3Client.putObject(request, file);
+            } catch (Exception e) {
+                // Continue with other files
+            }
+        });
+
+        return "Synced directory to S3: " + s3Uri;
+    }
+
+    private String syncFromS3(String s3Uri, String localPath) throws Exception {
+        S3Path s3Path = parseS3Path(s3Uri);
+        Path localDir = Paths.get(localPath);
+
+        Files.createDirectories(localDir);
+
+        ListObjectsV2Request listRequest = ListObjectsV2Request.builder()
+                .bucket(s3Path.bucket)
+                .prefix(s3Path.prefix)
+                .build();
+
+        ListObjectsV2Response listResponse = s3Client.listObjectsV2(listRequest);
+
+        for (S3Object s3Object : listResponse.contents()) {
+            String relativePath = s3Object.key();
+            if (!s3Path.prefix.isEmpty()) {
+                relativePath = s3Object.key().substring(s3Path.prefix.length());
+                if (relativePath.startsWith("/")) {
+                    relativePath = relativePath.substring(1);
+                }
+            }
+
+            Path targetFile = localDir.resolve(relativePath);
+            Files.createDirectories(targetFile.getParent());
+
+            GetObjectRequest getRequest = GetObjectRequest.builder()
+                    .bucket(s3Path.bucket)
+                    .key(s3Object.key())
+                    .build();
+
+            s3Client.getObject(getRequest, targetFile);
+        }
+
+        return "Synced from S3 to local: " + localPath;
+    }
 
     private String listBuckets() {
         ListBucketsResponse response = s3Client.listBuckets();

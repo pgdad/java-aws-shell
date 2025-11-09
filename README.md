@@ -140,21 +140,40 @@ unset BUCKET
 
 ### S3 Commands
 
+#### Bucket Operations
+
 ```bash
 # List all buckets
 s3 ls
 
+# Create a bucket
+s3 mb s3://bucket-name
+
+# Remove a bucket (must be empty)
+s3 rb s3://bucket-name
+
+# Check if bucket exists
+s3 head-bucket s3://bucket-name
+
+# Get bucket location/region
+s3 get-bucket-location s3://bucket-name
+
+# Get bucket versioning status
+s3 get-bucket-versioning s3://bucket-name
+
+# Enable/suspend bucket versioning
+s3 put-bucket-versioning s3://bucket-name --status Enabled
+s3 put-bucket-versioning s3://bucket-name --status Suspended
+```
+
+#### Object Operations
+
+```bash
 # List objects in a bucket
 s3 ls s3://bucket-name
 
 # List objects with a prefix
 s3 ls s3://bucket-name/prefix
-
-# Create a bucket
-s3 mb s3://bucket-name
-
-# Remove a bucket
-s3 rb s3://bucket-name
 
 # Upload a file
 s3 cp local-file.txt s3://bucket-name/key
@@ -165,8 +184,61 @@ s3 cp s3://bucket-name/key local-file.txt
 # Copy between S3 locations
 s3 cp s3://bucket1/key1 s3://bucket2/key2
 
+# Move an object (copy and delete)
+s3 mv s3://bucket/source s3://bucket/dest
+
 # Remove an object
 s3 rm s3://bucket-name/key
+
+# Delete multiple objects
+s3 delete-objects s3://bucket --keys "key1,key2,key3"
+
+# Get object metadata
+s3 head-object s3://bucket/key
+
+# Get object URL
+s3 get-object-url s3://bucket/key
+```
+
+#### Object Tagging
+
+```bash
+# Get object tags
+s3 get-object-tagging s3://bucket/key
+
+# Set object tags
+s3 put-object-tagging s3://bucket/key --tags "Environment=prod,Team=backend"
+
+# Delete object tags
+s3 delete-object-tagging s3://bucket/key
+```
+
+#### Sync Operations
+
+```bash
+# Sync local directory to S3
+s3 sync ./local-dir s3://bucket/prefix
+
+# Sync S3 to local directory
+s3 sync s3://bucket/prefix ./local-dir
+```
+
+#### Using Variables with S3
+
+```bash
+# Set bucket variable
+set BUCKET my-production-bucket
+
+# Use in commands
+s3 ls s3://$BUCKET
+s3 head-bucket s3://$BUCKET
+s3 cp file.txt s3://$BUCKET/uploads/file.txt
+s3 sync ./dist s3://$BUCKET/website
+
+# Object operations with variables
+set KEY data/file.json
+s3 head-object s3://$BUCKET/$KEY
+s3 get-object-tagging s3://$BUCKET/$KEY
 ```
 
 ### EC2 Commands
