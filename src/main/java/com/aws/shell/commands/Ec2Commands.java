@@ -1,5 +1,6 @@
 package com.aws.shell.commands;
 
+import com.aws.shell.context.SessionContext;
 import com.aws.shell.util.OutputFormatter;
 import org.springframework.shell.standard.ShellComponent;
 import org.springframework.shell.standard.ShellMethod;
@@ -17,15 +18,17 @@ import java.util.stream.Collectors;
 /**
  * EC2 Commands
  * <p>
- * Implements AWS EC2 CLI-like functionality
+ * Implements AWS EC2 CLI-like functionality with variable support
  */
 @ShellComponent
 public class Ec2Commands {
 
     private final Ec2Client ec2Client;
+    private final SessionContext sessionContext;
 
-    public Ec2Commands(Ec2Client ec2Client) {
+    public Ec2Commands(Ec2Client ec2Client, SessionContext sessionContext) {
         this.ec2Client = ec2Client;
+        this.sessionContext = sessionContext;
     }
 
     /**
@@ -34,11 +37,14 @@ public class Ec2Commands {
      * Usage:
      * ec2 describe-instances
      * ec2 describe-instances --instance-ids i-1234567890abcdef0
+     * ec2 describe-instances --instance-ids $INSTANCE_ID
      */
     @ShellMethod(key = "ec2 describe-instances", value = "Describe EC2 instances")
     public String describeInstances(
             @ShellOption(defaultValue = "") String instanceIds) {
         try {
+            instanceIds = sessionContext.resolveVariables(instanceIds);
+
             DescribeInstancesRequest.Builder requestBuilder = DescribeInstancesRequest.builder();
 
             if (!instanceIds.isEmpty()) {
@@ -88,10 +94,12 @@ public class Ec2Commands {
      * <p>
      * Usage:
      * ec2 start-instances --instance-ids i-1234567890abcdef0,i-0987654321fedcba0
+     * ec2 start-instances --instance-ids $INSTANCE_ID
      */
     @ShellMethod(key = "ec2 start-instances", value = "Start EC2 instances")
     public String startInstances(String instanceIds) {
         try {
+            instanceIds = sessionContext.resolveVariables(instanceIds);
             List<String> idList = Arrays.asList(instanceIds.split(","));
 
             StartInstancesRequest request = StartInstancesRequest.builder()
@@ -122,10 +130,12 @@ public class Ec2Commands {
      * <p>
      * Usage:
      * ec2 stop-instances --instance-ids i-1234567890abcdef0,i-0987654321fedcba0
+     * ec2 stop-instances --instance-ids $INSTANCE_ID
      */
     @ShellMethod(key = "ec2 stop-instances", value = "Stop EC2 instances")
     public String stopInstances(String instanceIds) {
         try {
+            instanceIds = sessionContext.resolveVariables(instanceIds);
             List<String> idList = Arrays.asList(instanceIds.split(","));
 
             StopInstancesRequest request = StopInstancesRequest.builder()
@@ -156,10 +166,12 @@ public class Ec2Commands {
      * <p>
      * Usage:
      * ec2 terminate-instances --instance-ids i-1234567890abcdef0
+     * ec2 terminate-instances --instance-ids $INSTANCE_ID
      */
     @ShellMethod(key = "ec2 terminate-instances", value = "Terminate EC2 instances")
     public String terminateInstances(String instanceIds) {
         try {
+            instanceIds = sessionContext.resolveVariables(instanceIds);
             List<String> idList = Arrays.asList(instanceIds.split(","));
 
             TerminateInstancesRequest request = TerminateInstancesRequest.builder()
@@ -226,10 +238,14 @@ public class Ec2Commands {
      * <p>
      * Usage:
      * ec2 describe-subnets
+     * ec2 describe-subnets --vpc-id vpc-12345678
+     * ec2 describe-subnets --vpc-id $VPC_ID
      */
     @ShellMethod(key = "ec2 describe-subnets", value = "Describe subnets")
     public String describeSubnets(@ShellOption(defaultValue = "") String vpcId) {
         try {
+            vpcId = sessionContext.resolveVariables(vpcId);
+
             DescribeSubnetsRequest.Builder requestBuilder = DescribeSubnetsRequest.builder();
 
             if (!vpcId.isEmpty()) {

@@ -1,5 +1,6 @@
 package com.aws.shell.commands;
 
+import com.aws.shell.context.SessionContext;
 import com.aws.shell.util.OutputFormatter;
 import org.springframework.shell.standard.ShellComponent;
 import org.springframework.shell.standard.ShellMethod;
@@ -15,15 +16,17 @@ import java.util.List;
 /**
  * IAM Commands
  * <p>
- * Implements AWS IAM CLI-like functionality
+ * Implements AWS IAM CLI-like functionality with variable support
  */
 @ShellComponent
 public class IamCommands {
 
     private final IamClient iamClient;
+    private final SessionContext sessionContext;
 
-    public IamCommands(IamClient iamClient) {
+    public IamCommands(IamClient iamClient, SessionContext sessionContext) {
         this.iamClient = iamClient;
+        this.sessionContext = sessionContext;
     }
 
     /**
@@ -66,10 +69,13 @@ public class IamCommands {
      * <p>
      * Usage:
      * iam get-user --user-name username
+     * iam get-user --user-name $USER_NAME
      */
     @ShellMethod(key = "iam get-user", value = "Get IAM user details")
     public String getUser(@ShellOption(defaultValue = "") String userName) {
         try {
+            userName = sessionContext.resolveVariables(userName);
+
             GetUserRequest.Builder requestBuilder = GetUserRequest.builder();
 
             if (!userName.isEmpty()) {
@@ -136,10 +142,13 @@ public class IamCommands {
      * <p>
      * Usage:
      * iam get-role --role-name rolename
+     * iam get-role --role-name $ROLE_NAME
      */
     @ShellMethod(key = "iam get-role", value = "Get IAM role details")
     public String getRole(String roleName) {
         try {
+            roleName = sessionContext.resolveVariables(roleName);
+
             GetRoleRequest request = GetRoleRequest.builder()
                     .roleName(roleName)
                     .build();
@@ -210,10 +219,13 @@ public class IamCommands {
      * <p>
      * Usage:
      * iam list-groups-for-user --user-name username
+     * iam list-groups-for-user --user-name $USER_NAME
      */
     @ShellMethod(key = "iam list-groups-for-user", value = "List groups for a user")
     public String listGroupsForUser(String userName) {
         try {
+            userName = sessionContext.resolveVariables(userName);
+
             ListGroupsForUserRequest request = ListGroupsForUserRequest.builder()
                     .userName(userName)
                     .build();
@@ -249,10 +261,13 @@ public class IamCommands {
      * <p>
      * Usage:
      * iam list-attached-user-policies --user-name username
+     * iam list-attached-user-policies --user-name $USER_NAME
      */
     @ShellMethod(key = "iam list-attached-user-policies", value = "List attached user policies")
     public String listAttachedUserPolicies(String userName) {
         try {
+            userName = sessionContext.resolveVariables(userName);
+
             ListAttachedUserPoliciesRequest request = ListAttachedUserPoliciesRequest.builder()
                     .userName(userName)
                     .build();

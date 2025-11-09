@@ -1,5 +1,6 @@
 package com.aws.shell.commands;
 
+import com.aws.shell.context.SessionContext;
 import com.aws.shell.util.OutputFormatter;
 import org.springframework.shell.standard.ShellComponent;
 import org.springframework.shell.standard.ShellMethod;
@@ -20,15 +21,17 @@ import java.util.List;
 /**
  * S3 Commands
  * <p>
- * Implements AWS S3 CLI-like functionality
+ * Implements AWS S3 CLI-like functionality with variable support
  */
 @ShellComponent
 public class S3Commands {
 
     private final S3Client s3Client;
+    private final SessionContext sessionContext;
 
-    public S3Commands(S3Client s3Client) {
+    public S3Commands(S3Client s3Client, SessionContext sessionContext) {
         this.s3Client = s3Client;
+        this.sessionContext = sessionContext;
     }
 
     /**
@@ -38,10 +41,14 @@ public class S3Commands {
      * s3 ls                    - List all buckets
      * s3 ls s3://bucket-name   - List objects in bucket
      * s3 ls s3://bucket/prefix - List objects with prefix
+     * s3 ls s3://$BUCKET       - Use variable
      */
     @ShellMethod(key = "s3 ls", value = "List S3 buckets or objects")
     public String list(@ShellOption(defaultValue = "") String path) {
         try {
+            // Resolve variables
+            path = sessionContext.resolveVariables(path);
+
             if (path.isEmpty()) {
                 // List all buckets
                 return listBuckets();
@@ -60,10 +67,12 @@ public class S3Commands {
      * <p>
      * Usage:
      * s3 mb s3://bucket-name
+     * s3 mb s3://$BUCKET
      */
     @ShellMethod(key = "s3 mb", value = "Create an S3 bucket")
     public String makeBucket(String bucketUri) {
         try {
+            bucketUri = sessionContext.resolveVariables(bucketUri);
             S3Path s3Path = parseS3Path(bucketUri);
 
             CreateBucketRequest request = CreateBucketRequest.builder()
@@ -82,10 +91,12 @@ public class S3Commands {
      * <p>
      * Usage:
      * s3 rb s3://bucket-name
+     * s3 rb s3://$BUCKET
      */
     @ShellMethod(key = "s3 rb", value = "Remove an S3 bucket")
     public String removeBucket(String bucketUri) {
         try {
+            bucketUri = sessionContext.resolveVariables(bucketUri);
             S3Path s3Path = parseS3Path(bucketUri);
 
             DeleteBucketRequest request = DeleteBucketRequest.builder()
@@ -106,10 +117,14 @@ public class S3Commands {
      * s3 cp local-file s3://bucket/key     - Upload file
      * s3 cp s3://bucket/key local-file     - Download file
      * s3 cp s3://bucket1/key s3://bucket2/key - Copy between buckets
+     * s3 cp $LOCAL_FILE s3://$BUCKET/$KEY  - Use variables
      */
     @ShellMethod(key = "s3 cp", value = "Copy files to/from S3")
     public String copy(String source, String destination) {
         try {
+            source = sessionContext.resolveVariables(source);
+            destination = sessionContext.resolveVariables(destination);
+
             boolean sourceIsS3 = source.startsWith("s3://");
             boolean destIsS3 = destination.startsWith("s3://");
 
@@ -135,10 +150,12 @@ public class S3Commands {
      * <p>
      * Usage:
      * s3 rm s3://bucket/key
+     * s3 rm s3://$BUCKET/$KEY
      */
     @ShellMethod(key = "s3 rm", value = "Remove S3 objects")
     public String remove(String path) {
         try {
+            path = sessionContext.resolveVariables(path);
             S3Path s3Path = parseS3Path(path);
 
             DeleteObjectRequest request = DeleteObjectRequest.builder()

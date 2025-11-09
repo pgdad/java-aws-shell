@@ -6,6 +6,8 @@ A Java Spring Shell based AWS CLI that provides AWS CLI-like functionality using
 
 - **Environment-based Configuration**: Automatically reads `AWS_PROFILE` and `AWS_REGION` environment variables
 - **Interactive Shell**: Built on Spring Shell for an intuitive command-line experience
+- **Shell Variables**: Store and reuse values across commands with `$VAR` syntax
+- **Variable Interpolation**: Use variables in any command parameter
 - **AWS Service Support**: Implements common AWS operations for:
   - S3 (Simple Storage Service)
   - EC2 (Elastic Compute Cloud)
@@ -58,6 +60,81 @@ java -jar target/aws-shell-1.0.0.jar
 If not set, the application defaults to:
 - Profile: `default`
 - Region: `us-east-2`
+
+## Shell Variables
+
+The shell supports variables for storing and reusing values across commands. Variables can be referenced using `$VAR_NAME` or `${VAR_NAME}` syntax.
+
+### Variable Management Commands
+
+```bash
+# Set a variable
+set MY_BUCKET my-test-bucket
+set INSTANCE_ID i-1234567890abcdef0
+
+# Get a variable value
+get MY_BUCKET
+
+# List all variables
+vars
+# or
+variables
+
+# Unset a variable
+unset MY_BUCKET
+
+# Clear all variables
+clear-vars
+
+# Export (alias for set)
+export REGION us-east-2
+
+# Echo with variable substitution
+echo My bucket is $MY_BUCKET
+```
+
+### Using Variables in Commands
+
+Variables can be used in any command that accepts string parameters:
+
+```bash
+# S3 examples
+set BUCKET my-test-bucket
+s3 ls s3://$BUCKET
+s3 cp file.txt s3://$BUCKET/uploads/file.txt
+s3 rm s3://${BUCKET}/old-file.txt
+
+# EC2 examples
+set INSTANCE_ID i-1234567890abcdef0
+ec2 describe-instances --instance-ids $INSTANCE_ID
+ec2 stop-instances --instance-ids $INSTANCE_ID
+
+set VPC_ID vpc-12345678
+ec2 describe-subnets --vpc-id $VPC_ID
+
+# IAM examples
+set USER_NAME john.doe
+iam get-user --user-name $USER_NAME
+iam list-groups-for-user --user-name $USER_NAME
+
+set ROLE_NAME MyAppRole
+iam get-role --role-name $ROLE_NAME
+```
+
+### Variable Workflow Example
+
+```bash
+# Workflow: Create bucket, upload file, then clean up
+set BUCKET test-bucket-$(date +%s)
+s3 mb s3://$BUCKET
+s3 cp myfile.txt s3://$BUCKET/myfile.txt
+s3 ls s3://$BUCKET
+
+# Later, clean up
+s3 rm s3://$BUCKET/myfile.txt
+s3 rb s3://$BUCKET
+unset BUCKET
+```
 
 ## Available Commands
 
@@ -194,10 +271,13 @@ src/main/java/com/aws/shell/
 │   ├── Ec2Commands.java              # EC2 operations
 │   ├── IamCommands.java              # IAM operations
 │   ├── S3Commands.java               # S3 operations
-│   └── StsCommands.java              # STS operations
+│   ├── StsCommands.java              # STS operations
+│   └── VariableCommands.java         # Variable management
 ├── config/                            # Configuration classes
 │   ├── AwsConfig.java                # AWS SDK client beans
 │   └── ShellPromptProvider.java      # Custom shell prompt
+├── context/                           # Session context
+│   └── SessionContext.java           # Variable storage and resolution
 └── util/                              # Utility classes
     └── OutputFormatter.java           # Output formatting utilities
 ```
