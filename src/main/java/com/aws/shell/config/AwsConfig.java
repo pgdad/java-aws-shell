@@ -9,6 +9,8 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.cloudformation.CloudFormationClient;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.ec2.Ec2Client;
+import software.amazon.awssdk.services.ecs.EcsClient;
+import software.amazon.awssdk.services.eks.EksClient;
 import software.amazon.awssdk.services.iam.IamClient;
 import software.amazon.awssdk.services.lambda.LambdaClient;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -122,6 +124,22 @@ public class AwsConfig {
     @Bean
     public SnsClient snsClient() {
         return SnsClient.builder()
+                .region(getRegion())
+                .credentialsProvider(getCredentialsProvider())
+                .build();
+    }
+
+    @Bean
+    public EcsClient ecsClient() {
+        return EcsClient.builder()
+                .region(getRegion())
+                .credentialsProvider(getCredentialsProvider())
+                .build();
+    }
+
+    @Bean
+    public EksClient eksClient() {
+        return EksClient.builder()
                 .region(getRegion())
                 .credentialsProvider(getCredentialsProvider())
                 .build();

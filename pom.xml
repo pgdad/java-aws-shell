@@ -108,6 +108,16 @@
             <artifactId>sns</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>ecs</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>eks</artifactId>
+        </dependency>
+
         <!-- Utilities -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
